@@ -11,18 +11,15 @@
 
 void print_time(struct timeval* time, int n) {
 	double avg = 0;
-
 	for (int i = 0; i < n; i++)
-		avg += time[i].tv_usec + time[i].tv_sec * 1000000;
-
+		avg += time[i].tv_usec + 1000000 * time[i].tv_sec;
 	avg /= n * 1000;
-
 	printf("%.2fms\n", avg);
 }
 
-bool more_than_one_ip(char ip_str[][20], int last) {
-	for (int i = last; i >= 0; i--)
-		if (strcmp(ip_str[i], ip_str[last]))
+bool more_than_one_ip(char ip_str[][20], int last_idx) {
+	for (int i = last_idx; i >= 0; i--)
+		if (strcmp(ip_str[i], ip_str[last_idx]))
 			return true;
 	return false;
 }
@@ -44,43 +41,53 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 	// in the file descriptor set 'descriptors/.
 	FD_SET(sockfd, &descriptors);
 
-	while (packets < packets_no && (!timeout.tv_sec || !timeout.tv_usec)) {
-		// https://man7.org/linux/man-pages/man2/select.2.html
-		if (select(sockfd + 1, &descriptors, NULL, NULL, &timeout) < 0)
-			return -1;
+	while (packets < packets_no && (timeout.tv_sec || timeout.tv_usec)) {
+		int ready_fd = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
+
+		if (ready_fd < 0) return ready_fd;
+		else if (ready_fd == 0) break;
 
 		struct sockaddr_in sender;
-		u_int8_t buffer[IP_MAXPACKET];
 		socklen_t sender_len = sizeof(sender);
+		u_int8_t buffer[IP_MAXPACKET];
 
-		ssize_t packet_len = recvfrom(sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT, (struct sockaddr*)&sender, &sender_len);
-		if (packet_len < 0) {
-			fprintf(stderr, "recvfrom error: %s\n", strerror(errno));
-			return -1;
-		}
+		ssize_t packet_len = recvfrom(
+			sockfd,
+			buffer,
+			IP_MAXPACKET,
+			MSG_DONTWAIT,
+			(struct sockaddr*) &sender,
+			&sender_len
+		);
+		if (packet_len < 0) return -1;
 
-		// ip from binary to string
 		if (inet_ntop(AF_INET, &(sender.sin_addr), ip_str[packets], sizeof(ip_str[packets])) == NULL)
 			return -1;
 
 		struct ip* ip_header = (struct ip*) buffer;
-		struct icmp* icmp_header = (struct icmp*) (buffer + 4 * ip_header->ip_hl);
+		u_int8_t* icmp_packet = buffer + 4 * ip_header->ip_hl;
+		struct icmp* icmp_header = (struct icmp*) icmp_packet;
 
-		if (icmp_header->icmp_type != ICMP_ECHOREPLY && icmp_header->icmp_type != ICMP_TIME_EXCEEDED)
-			continue;
+		if (
+			icmp_header->icmp_type != ICMP_ECHOREPLY &&
+			icmp_header->icmp_type != ICMP_TIME_EXCEEDED
+		) continue;
 		
-		// If the type is ICMP_TIME_EXCEEDED we need to move icmp by 64 bits (8 bytes):
+		struct icmp* org_icmp_header;
+		// If the type is ICMP_TIME_EXCEEDED we need to move icmp 
+		// by 64 bits (8 bytes) in order to get to the original datagram.
 		// https://www.frozentux.net/iptables-tutorial/chunkyhtml/x281.html
 		if (icmp_header->icmp_type == ICMP_TIME_EXCEEDED) {
-			ip_header = (struct ip*)((void *)icmp_header + 8);
-			icmp_header = (struct icmp*)(ip_header + 4 * ip_header->ip_hl);
+			struct ip* org_ip_header = (void *) icmp_header + 8;
+			org_icmp_header = (void *) org_ip_header + 4 * org_ip_header->ip_hl;
 		}
 
-		if (icmp_header->icmp_hun.ih_idseq.icd_seq != TTL && icmp_header->icmp_hun.ih_idseq.icd_id != pid)
-			continue;
+		if (
+			org_icmp_header->icmp_hun.ih_idseq.icd_id != pid &&
+			org_icmp_header->icmp_hun.ih_idseq.icd_seq != TTL
+		) continue;
 
-		if (!more_than_one) more_than_one = more_than_one_ip(ip_str, packets - 1);
-
+		if (!more_than_one) more_than_one = more_than_one_ip(ip_str, packets);
 
 		gettimeofday(&curr_time, NULL);
 		timersub(&curr_time, start_time, &time[packets]);
@@ -101,8 +108,8 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 			print_time(time, packets);
 		else printf("???\n");
 	} else {
-		printf("%s  ", ip_str[0]);
-		if (packets == packets_no || got_reply)
+		printf("%s ", ip_str[0]);
+		if (got_reply || packets == packets_no)
 			print_time(time, packets);
 		else printf("???\n");
 	}

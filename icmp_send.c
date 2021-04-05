@@ -29,10 +29,6 @@ int send_one(int sockfd, int TTL, struct sockaddr_in *dest, int id) {
     icmp_header.icmp_hun.ih_idseq.icd_id = id;
     icmp_header.icmp_cksum = 0;
     icmp_header.icmp_cksum = compute_icmp_checksum((u_int16_t*) &icmp_header, sizeof(icmp_header));
-
-    char a[20];
-    inet_ntop(AF_INET, &(dest->sin_addr), a, sizeof(a));
-    printf("IN send_one dest addr is %s\n", a);
     
     return sendto(
         sockfd,

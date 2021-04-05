@@ -41,7 +41,6 @@ int main(int argc, char const *argv[]) {
     int pid = getpid();
 
     for (int i = 1; i <= MAX_TTL; i++) {
-        // printf("TTL = %d\n", i);
         struct timeval start_time;
         gettimeofday(&start_time, NULL);
 
@@ -50,19 +49,15 @@ int main(int argc, char const *argv[]) {
                 fprintf(stderr, "Error when sending packets: %s\n", strerror(errno));
                 return EXIT_FAILURE;
             }
-        
-        // printf("Just sent 3 more!!!\n");
 
-        int status = receive(pid, sockfd, MAX_RESPONSE_TIME, i, PACKETS_TO_SEND, &start_time);
-        // printf("Just received!!!\n");
+        int res = receive(pid, sockfd, MAX_RESPONSE_TIME, i, PACKETS_TO_SEND, &start_time);
 
-        if (status < 0) {
+        if (res < 0) {
             fprintf(stderr, "Error when receiving packets: %s\n", strerror(errno));
             return EXIT_FAILURE;
         }
-        // printf("status = %d\n", status);
-        if (status == 1)
-            break;
+
+        if (res == 1) break;
     }
 
     close(sockfd);
