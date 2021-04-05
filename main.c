@@ -3,9 +3,13 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <unistd.h>
+#include <strings.h>
+#include <string.h>
+#include <sys/time.h>
 #include "icmp_send.h"
+#include "icmp_receive.h"
 
-#define RESPONSE_TIME 1
+#define MAX_RESPONSE_TIME 1
 #define PACKETS_TO_SEND 3
 #define MAX_TTL 30
 
@@ -16,9 +20,11 @@ int main(int argc, char const *argv[]) {
     }
 
     struct sockaddr_in dest;
+    bzero(&dest, sizeof(dest));
+    dest.sin_family = AF_INET;
     
     // Let's convert program argument to a proper IP:
-    if (!inet_pton(AF_INET, argv[1], &dest)) {
+    if (inet_pton(AF_INET, argv[1], &dest.sin_addr) != 1) {
         fprintf(stderr, "Error: Provided IP address is not correct.\n");
         return EXIT_FAILURE;
     }
@@ -30,10 +36,35 @@ int main(int argc, char const *argv[]) {
 		return EXIT_FAILURE;
 	}
 
+    // pid is a unique identifier that will help
+    // distinguish packages (because raw socket is used here).
     int pid = getpid();
+
     for (int i = 1; i <= MAX_TTL; i++) {
+        // printf("TTL = %d\n", i);
+        struct timeval start_time;
+        gettimeofday(&start_time, NULL);
+
+        for (int j = 0; j < PACKETS_TO_SEND; j++)
+            if (send_one(sockfd, i, &dest, pid) < 0) {
+                fprintf(stderr, "Error when sending packets: %s\n", strerror(errno));
+                return EXIT_FAILURE;
+            }
         
+        // printf("Just sent 3 more!!!\n");
+
+        int status = receive(pid, sockfd, MAX_RESPONSE_TIME, i, PACKETS_TO_SEND, &start_time);
+        // printf("Just received!!!\n");
+
+        if (status < 0) {
+            fprintf(stderr, "Error when receiving packets: %s\n", strerror(errno));
+            return EXIT_FAILURE;
+        }
+        // printf("status = %d\n", status);
+        if (status == 1)
+            break;
     }
 
-    return 0;
+    close(sockfd);
+    return EXIT_SUCCESS;
 }
