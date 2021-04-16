@@ -35,7 +35,7 @@ int send_one(int sockfd, int TTL, struct sockaddr_in *dest, int id) {
         &icmp_header,
         sizeof(icmp_header),
         0, // flags
-        (struct sockaddr*) dest,
+        (struct sockaddr *) dest,
         sizeof(*dest)
     );
 }

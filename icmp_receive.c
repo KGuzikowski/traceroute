@@ -41,10 +41,10 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 	// in the file descriptor set 'descriptors/.
 	FD_SET(sockfd, &descriptors);
 
-	while (packets < packets_no && (timeout.tv_sec || timeout.tv_usec)) {
+	while (packets < packets_no && (timeout.tv_sec > 0 || timeout.tv_usec > 0)) {
 		int ready_fd = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
 
-		if (ready_fd < 0) return ready_fd;
+		if (ready_fd < 0) return -1;
 		else if (ready_fd == 0) break;
 
 		struct sockaddr_in sender;
@@ -59,6 +59,7 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 			(struct sockaddr*) &sender,
 			&sender_len
 		);
+		
 		if (packet_len < 0) return -1;
 
 		if (inet_ntop(AF_INET, &(sender.sin_addr), ip_str[packets], sizeof(ip_str[packets])) == NULL)

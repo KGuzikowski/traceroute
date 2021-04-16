@@ -24,7 +24,7 @@ int main(int argc, char const *argv[]) {
     dest.sin_family = AF_INET;
     
     // Let's convert program argument to a proper IP:
-    if (inet_pton(AF_INET, argv[1], &dest.sin_addr) != 1) {
+    if (inet_pton(AF_INET, argv[1], &(dest.sin_addr)) != 1) {
         fprintf(stderr, "Error: Provided IP address is not correct.\n");
         return EXIT_FAILURE;
     }
