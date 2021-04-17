@@ -100,6 +100,8 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 		}
 	}
 
+	printf("About to print that shittt! -> ");
+
 	printf("%d. ", TTL);
 	if (packets == 0) printf("*\n");
 	else if (more_than_one) {
