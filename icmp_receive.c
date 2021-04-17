@@ -91,7 +91,7 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 			icmp_header->icmp_type != ICMP_TIME_EXCEEDED
 		) continue;
 		
-		struct icmp* org_icmp_header;
+		struct icmp* org_icmp_header = icmp_header;
 		// If the type is ICMP_TIME_EXCEEDED we need to move icmp 
 		// by 64 bits (8 bytes) in order to get to the original datagram.
 		// https://www.frozentux.net/iptables-tutorial/chunkyhtml/x281.html
