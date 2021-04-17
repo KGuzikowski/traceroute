@@ -17,18 +17,31 @@ void print_time(struct timeval* time, int n) {
 	printf("%.2fms\n", avg);
 }
 
-bool more_than_one_ip(char ip_str[][20], int last_idx) {
-	for (int i = last_idx; i >= 0; i--)
-		if (strcmp(ip_str[i], ip_str[last_idx]))
-			return true;
-	return false;
+void print_route(int packets, char ip_str[][20], struct timeval *time) {
+    if (packets == 0) {
+        printf("*\n");
+        return;
+    }
+
+    if (packets >= 1) printf("%s ", ip_str[0]);
+
+    if (packets >= 2 && strcmp(ip_str[0], ip_str[1]) != 0)
+        printf("%s ", ip_str[1]);
+
+    if (
+		packets >= 3 &&
+		strcmp(ip_str[0], ip_str[1]) != 0 &&
+		strcmp(ip_str[0], ip_str[2]) != 0
+	) printf("%s ", ip_str[2]);
+
+    if (packets == 3) print_time(time, packets);
+    else printf("???\n");
 }
 
 int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, struct timeval* start_time) {
 	struct timeval time[packets_no];
 	struct timeval timeout, curr_time;
 	timeout.tv_sec = max_resp_time; timeout.tv_usec = 0;
-	bool more_than_one = false;
 	bool got_reply = false;
 	int packets = 0;
 	char ip_str[packets_no][20];
@@ -88,34 +101,18 @@ int receive(int pid, int sockfd, int max_resp_time, int TTL, int packets_no, str
 			org_icmp_header->icmp_hun.ih_idseq.icd_seq != TTL
 		) continue;
 
-		if (!more_than_one) more_than_one = more_than_one_ip(ip_str, packets);
-
 		gettimeofday(&curr_time, NULL);
 		timersub(&curr_time, start_time, &time[packets]);
 		packets++;
 
-		if (icmp_header->icmp_type == ICMP_ECHOREPLY) {
+		if (icmp_header->icmp_type == ICMP_ECHOREPLY && packets == packets_no) {
 			got_reply = true;
 			break;
 		}
 	}
 
-	printf("About to print that shittt! -> ");
-
 	printf("%d. ", TTL);
-	if (packets == 0) printf("*\n");
-	else if (more_than_one) {
-		for (int i = 0; i < packets; i++)
-			printf("%s ", ip_str[i]);
-		if (packets == packets_no)
-			print_time(time, packets);
-		else printf("???\n");
-	} else {
-		printf("%s ", ip_str[0]);
-		if (got_reply || packets == packets_no)
-			print_time(time, packets);
-		else printf("???\n");
-	}
+	print_route(packets, ip_str, time);
 
 	return got_reply;
 }
